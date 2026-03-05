@@ -317,6 +317,33 @@ tbody td {
   display: flex;
   align-items: center;
 }
+
+.toast {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 14px 22px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+  z-index: 9999;
+  max-width: 90vw;
+  text-align: center;
+  pointer-events: none;
+  animation: toast-in 0.18s ease;
+}
+
+.toast-ok  { background: #16a34a; }
+.toast-warn { background: #d97706; }
+.toast-err  { background: #dc2626; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
 </style>
 </head>
 <body>
@@ -374,7 +401,8 @@ let records = {};
 let activeFilter = 'all';
 let lastScanned = null;
 let lastScannedTime = 0;
-const COOLDOWN_MS = 3000;
+const COOLDOWN_MS = 4000;
+let toastTimer = null;
 
 const startBtn = document.getElementById('startBtn');
 const stopBtn = document.getElementById('stopBtn');
@@ -395,6 +423,24 @@ function formatTime(ts) {
 function setFeedback(msg, type) {
   feedback.textContent = msg;
   feedback.className = type === 'ok' ? 'feedback-ok' : type === 'warn' ? 'feedback-warn' : 'feedback-err';
+}
+
+function showToast(msg, type) {
+  const prev = document.getElementById('scanToast');
+  if (prev) prev.remove();
+  clearTimeout(toastTimer);
+
+  const el = document.createElement('div');
+  el.id = 'scanToast';
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+
+  toastTimer = setTimeout(() => {
+    el.style.transition = 'opacity 0.3s ease';
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 300);
+  }, 2000);
 }
 
 function setConn(ok) {
@@ -420,10 +466,7 @@ async function checkin(id) {
   if (!id) return;
 
   const now = Date.now();
-  if (id === lastScanned && now - lastScannedTime < COOLDOWN_MS) {
-    setFeedback(`Already scanned ${id} recently. Please wait.`, 'warn');
-    return;
-  }
+  if (id === lastScanned && now - lastScannedTime < COOLDOWN_MS) return;
   lastScanned = id;
   lastScannedTime = now;
 
@@ -437,12 +480,12 @@ async function checkin(id) {
     records[data.student_id] = data.scans;
 
     const type = data.status === 'already_complete' ? 'warn' : 'ok';
-    setFeedback(data.message, type);
+    showToast(data.message, type);
     setConn(true);
     renderTable();
   } catch {
     setConn(false);
-    setFeedback('Server error — check-in could not be saved.', 'err');
+    showToast('Server error — check-in could not be saved.', 'err');
   }
 }
 
@@ -533,7 +576,12 @@ clearBtn.addEventListener('click', async () => {
   }
 });
 
-// Quagga scanner
+// Quagga scanner — onDetected registered once here, not inside the click handler
+Quagga.onDetected(result => {
+  const code = result.codeResult.code;
+  if (code) checkin(code);
+});
+
 startBtn.addEventListener('click', () => {
   Quagga.init({
     inputStream: {
@@ -552,17 +600,12 @@ startBtn.addEventListener('click', () => {
     locate: true
   }, err => {
     if (err) {
-      setFeedback('Camera error: ' + err.message, 'err');
+      showToast('Camera error: ' + err.message, 'err');
       return;
     }
     Quagga.start();
     startBtn.style.display = 'none';
     stopBtn.style.display = 'inline-block';
-  });
-
-  Quagga.onDetected(result => {
-    const code = result.codeResult.code;
-    if (code) checkin(code);
   });
 });
 
