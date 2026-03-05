@@ -36,7 +36,7 @@ init_db()
 
 @app.route('/')
 def index():
-    return send_file('barcode-checkin.html')
+    return send_file('index.html')
 
 
 @app.post('/checkin')

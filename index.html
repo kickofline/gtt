@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student check-in</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+</head>
+<body>
+
+<h1>Student check-in</h1>
+<p class="subtitle">Scan a student ID barcode to record attendance. Three scans required per student.</p>
+
+<div id="connStatus"><span class="conn-dot" id="connDot"></span><span id="connLabel">Connecting to server…</span></div>
+
+<div class="scanner-section">
+  <h2>Scanner</h2>
+  <div id="viewport">
+    <div class="scan-overlay"><div class="scan-frame"></div></div>
+  </div>
+  <div class="btn-row">
+    <button id="startBtn">Start camera</button>
+    <button id="stopBtn">Stop camera</button>
+  </div>
+  <div class="manual-row">
+    <input type="text" id="manualInput" placeholder="Or enter student ID manually…" autocomplete="off">
+    <button id="manualBtn">Check in</button>
+  </div>
+  <div id="feedback"></div>
+</div>
+
+<div class="records-section">
+  <div class="records-header">
+    <h2>Attendance records</h2>
+    <div class="header-btns">
+      <button id="exportBtn" disabled>Export completed</button>
+      <button id="clearBtn">Clear all</button>
+    </div>
+  </div>
+  <div class="filter-row">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="done">Completed</button>
+    <button class="filter-btn" data-filter="partial">In progress</button>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Student ID</th>
+        <th>Check-ins</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+  <div id="emptyMsg" class="empty-msg">No students checked in yet.</div>
+</div>
+
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>
