@@ -125,7 +125,7 @@ function renderTable() {
     tr.innerHTML = `
       <td>
         <strong>${id}</strong>
-        <button class="btn-edit-id" data-id="${id}" title="Edit student ID">✎</button>
+        <button class="btn-edit-id" data-id="${id}" title="Edit student ID">Edit</button>
       </td>
       <td><div class="check-cell">${checkCells}</div></td>
       <td>${done
