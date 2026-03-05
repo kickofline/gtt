@@ -1,9 +1,10 @@
+import os
 import sqlite3
 import time
 from contextlib import contextmanager
 from flask import Flask, request, jsonify, send_file, abort
 
-DB_PATH = "checkins.db"
+DB_PATH = os.environ.get("DB_PATH", "checkins.db")
 
 app = Flask(__name__)
 
