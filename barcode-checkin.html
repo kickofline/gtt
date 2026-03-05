@@ -344,6 +344,61 @@ tbody td {
   from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
+
+.btn-edit-id {
+  font-size: 0.72rem;
+  padding: 2px 5px;
+  background: none;
+  color: #ccc;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-left: 4px;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
+.btn-edit-id:hover { color: #2563eb; border-color: #2563eb; }
+
+.btn-del-scan {
+  font-size: 0.65rem;
+  padding: 1px 4px;
+  background: none;
+  color: #ddd;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.btn-del-scan:hover { color: #dc2626; background: #fee2e2; }
+
+.btn-del-row {
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  background: #fee2e2;
+  color: #b91c1c;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn-del-row:hover { background: #fecaca; }
+
+.edit-id-input {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  padding: 3px 6px;
+  border: 2px solid #2563eb;
+  border-radius: 4px;
+  width: 100%;
+  font-weight: 700;
+  outline: none;
+}
 </style>
 </head>
 <body>
@@ -388,6 +443,7 @@ tbody td {
         <th>Student ID</th>
         <th>Check-ins</th>
         <th>Status</th>
+        <th></th>
       </tr>
     </thead>
     <tbody id="tableBody"></tbody>
@@ -511,22 +567,115 @@ function renderTable() {
 
     const checkCells = [0, 1, 2].map(i => {
       if (scans[i]) {
-        return `<div class="check-item"><span class="tick">✓</span><span class="time-label">${formatTime(scans[i])}</span></div>`;
+        return `<div class="check-item">
+          <span class="tick">✓</span>
+          <span class="time-label">${formatTime(scans[i].timestamp)}</span>
+          <button class="btn-del-scan" data-checkin-id="${scans[i].id}" data-student-id="${id}" title="Remove this check-in">✕</button>
+        </div>`;
       }
       return `<div class="check-item" style="color:#ccc">—</div>`;
     }).join('');
 
     tr.innerHTML = `
-      <td><strong>${id}</strong></td>
+      <td>
+        <strong>${id}</strong>
+        <button class="btn-edit-id" data-id="${id}" title="Edit student ID">✎</button>
+      </td>
       <td><div class="check-cell">${checkCells}</div></td>
       <td>${done
         ? '<span class="badge badge-done">Complete</span>'
         : `<span class="badge badge-partial">${scans.length}/3</span>`
       }</td>
+      <td><button class="btn-del-row" data-id="${id}">Delete</button></td>
     `;
     tableBody.appendChild(tr);
   });
 }
+
+function startEditId(td, oldId) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = oldId;
+  input.className = 'edit-id-input';
+  td.innerHTML = '';
+  td.appendChild(input);
+  input.focus();
+  input.select();
+
+  let saved = false;
+  const save = async () => {
+    if (saved) return;
+    saved = true;
+    const newId = input.value.trim();
+    if (newId && newId !== oldId) {
+      await renameStudent(oldId, newId);
+    } else {
+      renderTable();
+    }
+  };
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') save();
+    if (e.key === 'Escape') { saved = true; renderTable(); }
+  });
+  input.addEventListener('blur', save);
+}
+
+async function deleteCheckin(checkinId, studentId) {
+  try {
+    await fetch(`${API}/checkins/${checkinId}`, { method: 'DELETE' });
+    records[studentId] = records[studentId].filter(s => s.id !== checkinId);
+    if (records[studentId].length === 0) delete records[studentId];
+    setConn(true);
+    renderTable();
+  } catch {
+    setConn(false);
+    showToast('Could not delete check-in.', 'err');
+  }
+}
+
+async function deleteStudent(id) {
+  try {
+    await fetch(`${API}/records/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    delete records[id];
+    setConn(true);
+    renderTable();
+  } catch {
+    setConn(false);
+    showToast('Could not delete student.', 'err');
+  }
+}
+
+async function renameStudent(oldId, newId) {
+  try {
+    await fetch(`${API}/records/${encodeURIComponent(oldId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ new_student_id: newId })
+    });
+    records[newId] = records[oldId];
+    delete records[oldId];
+    setConn(true);
+    renderTable();
+  } catch {
+    setConn(false);
+    showToast('Could not rename student.', 'err');
+  }
+}
+
+tableBody.addEventListener('click', e => {
+  const delScan = e.target.closest('.btn-del-scan');
+  const delRow = e.target.closest('.btn-del-row');
+  const editId = e.target.closest('.btn-edit-id');
+  if (delScan) {
+    deleteCheckin(parseInt(delScan.dataset.checkinId), delScan.dataset.studentId);
+  } else if (delRow) {
+    if (!confirm(`Delete all check-ins for ${delRow.dataset.id}?`)) return;
+    deleteStudent(delRow.dataset.id);
+  } else if (editId) {
+    startEditId(editId.closest('td'), editId.dataset.id);
+  }
+});
 
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -553,7 +702,7 @@ exportBtn.addEventListener('click', () => {
   const completed = Object.entries(records).filter(([, scans]) => scans.length >= 3);
   const rows = [['Student ID', 'Check-in 1', 'Check-in 2', 'Check-in 3']];
   completed.forEach(([id, scans]) => {
-    rows.push([id, formatTime(scans[0]), formatTime(scans[1]), formatTime(scans[2])]);
+    rows.push([id, formatTime(scans[0].timestamp), formatTime(scans[1].timestamp), formatTime(scans[2].timestamp)]);
   });
   const csv = rows.map(r => r.join(',')).join('\n');
   const a = document.createElement('a');

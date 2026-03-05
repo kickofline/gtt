@@ -48,14 +48,14 @@ def checkin():
 
     with get_db() as con:
         rows = con.execute(
-            'SELECT timestamp FROM checkins WHERE student_id = ? ORDER BY timestamp ASC',
+            'SELECT id, timestamp FROM checkins WHERE student_id = ? ORDER BY timestamp ASC',
             (sid,)
         ).fetchall()
 
         if len(rows) >= 3:
             return jsonify({
                 'student_id': sid,
-                'scans': [r['timestamp'] for r in rows],
+                'scans': [{'id': r['id'], 'timestamp': r['timestamp']} for r in rows],
                 'status': 'already_complete',
                 'message': f'{sid} has already completed all 3 check-ins.'
             })
@@ -67,10 +67,10 @@ def checkin():
         )
 
         updated = con.execute(
-            'SELECT timestamp FROM checkins WHERE student_id = ? ORDER BY timestamp ASC',
+            'SELECT id, timestamp FROM checkins WHERE student_id = ? ORDER BY timestamp ASC',
             (sid,)
         ).fetchall()
-        scans = [r['timestamp'] for r in updated]
+        scans = [{'id': r['id'], 'timestamp': r['timestamp']} for r in updated]
 
     return jsonify({
         'student_id': sid,
@@ -84,7 +84,7 @@ def checkin():
 def get_records():
     with get_db() as con:
         rows = con.execute(
-            'SELECT student_id, timestamp FROM checkins ORDER BY student_id, timestamp ASC'
+            'SELECT id, student_id, timestamp FROM checkins ORDER BY student_id, timestamp ASC'
         ).fetchall()
 
     records = {}
@@ -92,9 +92,27 @@ def get_records():
         sid = row['student_id']
         if sid not in records:
             records[sid] = []
-        records[sid].append(row['timestamp'])
+        records[sid].append({'id': row['id'], 'timestamp': row['timestamp']})
 
     return jsonify({'records': records})
+
+
+@app.delete('/checkins/<int:checkin_id>')
+def delete_checkin(checkin_id):
+    with get_db() as con:
+        con.execute('DELETE FROM checkins WHERE id = ?', (checkin_id,))
+    return jsonify({'deleted': checkin_id})
+
+
+@app.patch('/records/<student_id>')
+def rename_student(student_id):
+    body = request.get_json(force=True) or {}
+    new_id = (body.get('new_student_id') or '').strip()
+    if not new_id:
+        abort(400, description='new_student_id is required')
+    with get_db() as con:
+        con.execute('UPDATE checkins SET student_id = ? WHERE student_id = ?', (new_id, student_id))
+    return jsonify({'old': student_id, 'new': new_id})
 
 
 @app.delete('/records/<student_id>')
