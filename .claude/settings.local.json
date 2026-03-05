@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(pip install flask flask-cors)",
+      "Bash(git add .gitignore backend.py barcode-checkin.html .claude/launch.json)",
+      "Bash(git commit:*)",
+      "Bash(git add backend.py requirements.txt Dockerfile)",
+      "Bash(git add barcode-checkin.html)",
+      "Bash(git reset --hard HEAD~1)",
+      "Bash(git add backend.py barcode-checkin.html)",
+      "Bash(git rm barcode-checkin.html)",
+      "Bash(git add index.html static/style.css static/app.js backend.py Dockerfile)"
+    ]
+  }
+}
