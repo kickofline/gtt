@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student check-in</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Helvetica, Arial, sans-serif;
+  background: #f4f4f4;
+  margin: 0;
+  padding: 16px;
+  color: #222;
+}
+
+h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  font-size: 0.85rem;
+  color: #666;
+  margin: 0 0 20px;
+}
+
+.scanner-section {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.scanner-section h2 {
+  font-size: 1rem;
+  margin: 0 0 12px;
+}
+
+#viewport {
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 4/3;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+#viewport video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#viewport canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.scan-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.scan-frame {
+  width: 70%;
+  height: 40%;
+  border: 2px solid rgba(255,255,255,0.6);
+  border-radius: 6px;
+  box-shadow: 0 0 0 2000px rgba(0,0,0,0.35);
+}
+
+.btn-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+button {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 0.9rem;
+  padding: 9px 18px;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+#startBtn {
+  background: #2563eb;
+  color: #fff;
+}
+
+#stopBtn {
+  background: #e5e7eb;
+  color: #333;
+  display: none;
+}
+
+.manual-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.manual-row input {
+  flex: 1;
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  outline: none;
+}
+
+.manual-row input:focus {
+  border-color: #2563eb;
+}
+
+.manual-row button {
+  background: #2563eb;
+  color: #fff;
+}
+
+#feedback {
+  margin-top: 12px;
+  min-height: 32px;
+  font-size: 0.9rem;
+}
+
+.feedback-ok {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.feedback-warn {
+  color: #d97706;
+  font-weight: 600;
+}
+
+.feedback-err {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.records-section {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.records-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.records-header h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.header-btns {
+  display: flex;
+  gap: 8px;
+}
+
+#exportBtn {
+  background: #16a34a;
+  color: #fff;
+  font-size: 0.82rem;
+  padding: 7px 14px;
+}
+
+#exportBtn:disabled {
+  background: #d1d5db;
+  color: #999;
+  cursor: not-allowed;
+}
+
+#clearBtn {
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 0.82rem;
+  padding: 7px 14px;
+}
+
+.filter-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.filter-row button {
+  font-size: 0.8rem;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-weight: 500;
+  background: #e5e7eb;
+  color: #333;
+}
+
+.filter-row button.active {
+  background: #2563eb;
+  color: #fff;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+thead th {
+  text-align: left;
+  padding: 7px 10px;
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+  font-weight: 600;
+  color: #555;
+}
+
+tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+tbody td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+}
+
+.check-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+}
+
+.check-item .tick {
+  color: #16a34a;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.check-item .time-label {
+  color: #444;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.badge-done {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.badge-partial {
+  background: #fef9c3;
+  color: #92400e;
+}
+
+.empty-msg {
+  text-align: center;
+  color: #aaa;
+  padding: 30px 0;
+  font-size: 0.9rem;
+}
+
+.conn-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 5px;
+  background: #d1d5db;
+}
+
+.conn-dot.ok { background: #16a34a; }
+.conn-dot.err { background: #dc2626; }
+
+#connStatus {
+  font-size: 0.78rem;
+  color: #888;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+}
+</style>
+</head>
+<body>
+
+<h1>Student check-in</h1>
+<p class="subtitle">Scan a student ID barcode to record attendance. Three scans required per student.</p>
+
+<div id="connStatus"><span class="conn-dot" id="connDot"></span><span id="connLabel">Connecting to server…</span></div>
+
+<div class="scanner-section">
+  <h2>Scanner</h2>
+  <div id="viewport">
+    <div class="scan-overlay"><div class="scan-frame"></div></div>
+  </div>
+  <div class="btn-row">
+    <button id="startBtn">Start camera</button>
+    <button id="stopBtn">Stop camera</button>
+  </div>
+  <div class="manual-row">
+    <input type="text" id="manualInput" placeholder="Or enter student ID manually…" autocomplete="off">
+    <button id="manualBtn">Check in</button>
+  </div>
+  <div id="feedback"></div>
+</div>
+
+<div class="records-section">
+  <div class="records-header">
+    <h2>Attendance records</h2>
+    <div class="header-btns">
+      <button id="exportBtn" disabled>Export completed</button>
+      <button id="clearBtn">Clear all</button>
+    </div>
+  </div>
+  <div class="filter-row">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="done">Completed</button>
+    <button class="filter-btn" data-filter="partial">In progress</button>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Student ID</th>
+        <th>Check-ins</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+  <div id="emptyMsg" class="empty-msg">No students checked in yet.</div>
+</div>
+
+<script type="module">
+const API = ''; // same origin — backend serves this file
+let records = {};
+let activeFilter = 'all';
+let lastScanned = null;
+let lastScannedTime = 0;
+const COOLDOWN_MS = 3000;
+
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const manualInput = document.getElementById('manualInput');
+const manualBtn = document.getElementById('manualBtn');
+const feedback = document.getElementById('feedback');
+const tableBody = document.getElementById('tableBody');
+const emptyMsg = document.getElementById('emptyMsg');
+const exportBtn = document.getElementById('exportBtn');
+const clearBtn = document.getElementById('clearBtn');
+const connDot = document.getElementById('connDot');
+const connLabel = document.getElementById('connLabel');
+
+function formatTime(ts) {
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function setFeedback(msg, type) {
+  feedback.textContent = msg;
+  feedback.className = type === 'ok' ? 'feedback-ok' : type === 'warn' ? 'feedback-warn' : 'feedback-err';
+}
+
+function setConn(ok) {
+  connDot.className = 'conn-dot ' + (ok ? 'ok' : 'err');
+  connLabel.textContent = ok ? 'Connected to server' : 'Cannot reach server';
+}
+
+async function loadRecords() {
+  try {
+    const res = await fetch(API + '/records');
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    records = data.records;
+    setConn(true);
+    renderTable();
+  } catch {
+    setConn(false);
+  }
+}
+
+async function checkin(id) {
+  id = id.trim();
+  if (!id) return;
+
+  const now = Date.now();
+  if (id === lastScanned && now - lastScannedTime < COOLDOWN_MS) {
+    setFeedback(`Already scanned ${id} recently. Please wait.`, 'warn');
+    return;
+  }
+  lastScanned = id;
+  lastScannedTime = now;
+
+  try {
+    const res = await fetch(API + '/checkin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: id })
+    });
+    const data = await res.json();
+    records[data.student_id] = data.scans;
+
+    const type = data.status === 'already_complete' ? 'warn' : 'ok';
+    setFeedback(data.message, type);
+    setConn(true);
+    renderTable();
+  } catch {
+    setConn(false);
+    setFeedback('Server error — check-in could not be saved.', 'err');
+  }
+}
+
+function renderTable() {
+  const ids = Object.keys(records);
+  const completed = ids.filter(id => records[id].length >= 3);
+  exportBtn.disabled = completed.length === 0;
+
+  const filtered = ids.filter(id => {
+    const n = records[id].length;
+    if (activeFilter === 'done') return n >= 3;
+    if (activeFilter === 'partial') return n < 3;
+    return true;
+  });
+
+  emptyMsg.style.display = filtered.length === 0 ? 'block' : 'none';
+  tableBody.innerHTML = '';
+
+  filtered.sort().forEach(id => {
+    const scans = records[id];
+    const done = scans.length >= 3;
+    const tr = document.createElement('tr');
+
+    const checkCells = [0, 1, 2].map(i => {
+      if (scans[i]) {
+        return `<div class="check-item"><span class="tick">✓</span><span class="time-label">${formatTime(scans[i])}</span></div>`;
+      }
+      return `<div class="check-item" style="color:#ccc">—</div>`;
+    }).join('');
+
+    tr.innerHTML = `
+      <td><strong>${id}</strong></td>
+      <td><div class="check-cell">${checkCells}</div></td>
+      <td>${done
+        ? '<span class="badge badge-done">Complete</span>'
+        : `<span class="badge badge-partial">${scans.length}/3</span>`
+      }</td>
+    `;
+    tableBody.appendChild(tr);
+  });
+}
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.filter;
+    renderTable();
+  });
+});
+
+manualBtn.addEventListener('click', () => {
+  checkin(manualInput.value);
+  manualInput.value = '';
+});
+
+manualInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    checkin(manualInput.value);
+    manualInput.value = '';
+  }
+});
+
+exportBtn.addEventListener('click', () => {
+  const completed = Object.entries(records).filter(([, scans]) => scans.length >= 3);
+  const rows = [['Student ID', 'Check-in 1', 'Check-in 2', 'Check-in 3']];
+  completed.forEach(([id, scans]) => {
+    rows.push([id, formatTime(scans[0]), formatTime(scans[1]), formatTime(scans[2])]);
+  });
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;base64,' + btoa(csv);
+  a.download = 'completed-checkins.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+});
+
+clearBtn.addEventListener('click', async () => {
+  if (!confirm('Clear all check-in records? This cannot be undone.')) return;
+  try {
+    await fetch(API + '/records', { method: 'DELETE' });
+    records = {};
+    setFeedback('All records cleared.', 'warn');
+    renderTable();
+  } catch {
+    setFeedback('Server error — could not clear records.', 'err');
+  }
+});
+
+// Quagga scanner
+startBtn.addEventListener('click', () => {
+  Quagga.init({
+    inputStream: {
+      name: 'Live',
+      type: 'LiveStream',
+      target: document.getElementById('viewport'),
+      constraints: {
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    },
+    decoder: {
+      readers: ['code_128_reader', 'code_39_reader', 'ean_reader', 'upc_reader', 'codabar_reader']
+    },
+    locate: true
+  }, err => {
+    if (err) {
+      setFeedback('Camera error: ' + err.message, 'err');
+      return;
+    }
+    Quagga.start();
+    startBtn.style.display = 'none';
+    stopBtn.style.display = 'inline-block';
+  });
+
+  Quagga.onDetected(result => {
+    const code = result.codeResult.code;
+    if (code) checkin(code);
+  });
+});
+
+stopBtn.addEventListener('click', () => {
+  Quagga.stop();
+  startBtn.style.display = 'inline-block';
+  stopBtn.style.display = 'none';
+});
+
+// Poll for updates every 10s so multiple instances stay in sync
+loadRecords();
+setInterval(loadRecords, 10000);
+</script>
+</body>
+</html>
